@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-// Design tokens from design.md (Academic Precision)
 class AppColors {
   static const background = Color(0xFFF5F5F7);
   static const surface = Color(0xFFFBF9F8);
@@ -12,6 +11,8 @@ class AppColors {
   static const successLight = Color(0xFF5AA958);
   static const progressBar = Color(0xFFEAE8E7);
   static const cardDone = Color(0xFFF0EDED);
+  static const inputFill = Color(0xFFEEEEEE);
+  static const error = Color(0xFFBA1A1A);
 }
 
 void main() {
@@ -50,6 +51,45 @@ class MyApp extends StatelessWidget {
           foregroundColor: Colors.white,
           elevation: 4,
         ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: AppColors.inputFill,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: AppColors.primary, width: 2),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: AppColors.error, width: 1),
+          ),
+          focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: AppColors.error, width: 2),
+          ),
+          labelStyle: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            letterSpacing: 0.6,
+            color: AppColors.onSurfaceVariant,
+          ),
+          hintStyle: const TextStyle(
+            fontSize: 14,
+            color: AppColors.onSurfaceVariant,
+          ),
+          errorStyle: const TextStyle(fontSize: 12, color: AppColors.error),
+        ),
       ),
       home: const HomeScreen(),
     );
@@ -79,6 +119,26 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _goals[index]['done'] = !_goals[index]['done'];
     });
+  }
+
+  Future<void> _openAddGoalScreen() async {
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(builder: (context) => const AddGoalScreen()),
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        _goals.add(result);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('"${result['subject']}" added to your goals'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.primary,
+        ),
+      );
+    }
   }
 
   int get _totalGoals => _goals.length;
@@ -167,8 +227,180 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {},
+        onPressed: _openAddGoalScreen,
         child: const Icon(Icons.add),
+      ),
+    );
+  }
+}
+
+class AddGoalScreen extends StatefulWidget {
+  const AddGoalScreen({super.key});
+
+  @override
+  State<AddGoalScreen> createState() => _AddGoalScreenState();
+}
+
+class _AddGoalScreenState extends State<AddGoalScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _subjectController = TextEditingController();
+  final _hoursController = TextEditingController();
+  final _subjectFocus = FocusNode();
+  bool _isSaving = false;
+
+  static const _pageMargin = 20.0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _subjectFocus.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _subjectController.dispose();
+    _hoursController.dispose();
+    _subjectFocus.dispose();
+    super.dispose();
+  }
+
+  String? _validateSubject(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Subject cannot be empty';
+    }
+    return null;
+  }
+
+  String? _validateHours(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Hours cannot be empty';
+    }
+    final hours = int.tryParse(value.trim());
+    if (hours == null) {
+      return 'Please enter a valid number';
+    }
+    if (hours <= 0) {
+      return 'Hours must be greater than 0';
+    }
+    return null;
+  }
+
+  Future<void> _saveGoal() async {
+    if (_isSaving) return;
+
+    FocusScope.of(context).unfocus();
+    setState(() => _isSaving = true);
+
+    if (_formKey.currentState!.validate()) {
+      Navigator.pop(context, {
+        'subject': _subjectController.text.trim(),
+        'hours': int.parse(_hoursController.text.trim()),
+        'done': false,
+      });
+      return;
+    }
+
+    setState(() => _isSaving = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Add Goal'),
+          bottom: const PreferredSize(
+            preferredSize: Size.fromHeight(1),
+            child: Divider(height: 1, color: AppColors.outline),
+          ),
+        ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(_pageMargin),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 8),
+                const Text(
+                  'New Study Goal',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Add a subject and how many hours you plan to study.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.5,
+                    color: AppColors.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                TextFormField(
+                  controller: _subjectController,
+                  focusNode: _subjectFocus,
+                  keyboardType: TextInputType.text,
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(
+                    labelText: 'SUBJECT',
+                    hintText: 'e.g., Flutter Programming',
+                  ),
+                  validator: _validateSubject,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _hoursController,
+                  keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.done,
+                  decoration: const InputDecoration(
+                    labelText: 'HOURS',
+                    hintText: 'e.g., 3',
+                  ),
+                  validator: _validateHours,
+                  onFieldSubmitted: (_) => _saveGoal(),
+                ),
+                const SizedBox(height: 32),
+                SizedBox(
+                  height: 48,
+                  child: FilledButton(
+                    onPressed: _isSaving ? null : _saveGoal,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: AppColors.primary.withValues(
+                        alpha: 0.5,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    child: _isSaving
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text('Save Goal'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
